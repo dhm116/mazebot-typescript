@@ -18,6 +18,10 @@ class Point {
     }
   }
 
+  getKey() {
+    return this.toString();
+  }
+
   toString() {
     return `${this.x},${this.y}`;
   }
@@ -60,7 +64,7 @@ const MovementSpaces = {
 const visited = new Map();
 const candidates = new Map();
 const directions = [];
-const GridSize = 40;
+const GridSize = 10;
 let beginAt;
 let endAt;
 let maze;
@@ -116,37 +120,96 @@ function ValidNeighbors(cell) {
   );
 }
 
-function Explore(fromPoint) {
-  const toTest = ValidNeighbors(fromPoint);
+// function Explore(fromPoint) {
+//   const toTest = ValidNeighbors(fromPoint);
 
+//   // console.log(`At ${fromPoint}, found ${(toTest || []).length} neighbors to try`);
+
+//   if (!toTest && Array.isArray(toTest) && !toTest.length) {
+//     // console.error('No valid neighbors found from', fromPoint.toString());
+//     return [];
+//   }
+
+//   if (!Array.isArray(toTest) && toTest) {
+//     const direction = relativeDirection(fromPoint, toTest);
+//     visited.set(toTest.toString(), direction);
+//     return [direction];
+//   }
+
+//   const results = toTest.map(toPoint => {
+//     if (visited.has(toPoint.toString())) {
+//       return [];
+//     }
+//     // console.log(`Exploring ${toPoint} from ${fromPoint}`);
+//     visited.set(toPoint.toString(), relativeDirection(fromPoint, toPoint));
+//     return Explore(toPoint);
+//   });
+
+//   const paths = results
+//     .map((route, index) => ({ toPoint: toTest[index], result: route }))
+//     .filter(route => route.result && route.result.length);
+
+//   if (!paths.length) {
+//     return [];
+//   }
+
+//   // console.log('VALID PATHS FROM', fromPoint.toString(), ':', paths.map(path => path.result.length));
+
+//   const path = paths.reduce(
+//     (result, route) => (!result.result || route.result.length < result.result.length ? route : result),
+//     {},
+//   );
+//   // console.log('SHORTEST PATH FROM', fromPoint.toString(), ':', path.result.length);
+//   if (!path.result || !path.result.length) {
+//     return [];
+//   }
+//   return [relativeDirection(fromPoint, path.toPoint)].concat(path.result);
+// }
+
+function Explore(fromPoint, history = new Set()) {
+  if (!history.length) {
+    history.add(fromPoint.toString());
+  }
+  const toTest = ValidNeighbors(fromPoint, history);
+
+  console.log('Neighbors from', fromPoint.toString(), ':', pretty(toTest));
   // console.log(`At ${fromPoint}, found ${(toTest || []).length} neighbors to try`);
 
-  if (!toTest && Array.isArray(toTest) && !toTest.length) {
-    // console.error('No valid neighbors found from', fromPoint.toString());
-    return [];
+  if (!toTest || (Array.isArray(toTest) && !toTest.length)) {
+    console.error('No valid neighbors found from', fromPoint.toString());
+    return { toPoint: fromPoint, result: [] };
   }
 
   if (!Array.isArray(toTest) && toTest) {
-    const direction = relativeDirection(fromPoint, toTest);
-    visited.set(toTest.toString(), direction);
-    return [direction];
+    console.log('Found final point?', toTest.toString(), toTest.toString() === endAt.toString());
+    // const direction = relativeDirection(fromPoint, toTest);
+    // visited.set(toTest.toString(), direction);
+    return { toPoint: fromPoint, result: [toTest] };
   }
 
   const results = toTest.map(toPoint => {
-    if (visited.has(toPoint.toString())) {
-      return [];
+    if (history.has(toPoint.toString())) {
+      console.log('History already had', toPoint.toString());
+      return { toPoint, result: [] };
     }
     // console.log(`Exploring ${toPoint} from ${fromPoint}`);
-    visited.set(toPoint.toString(), relativeDirection(fromPoint, toPoint));
-    return Explore(toPoint);
+    // visited.set(toPoint.toString(), '');
+    history.add(toPoint.toString());
+    return { toPoint, result: Explore(toPoint, history) };
   });
 
+  // console.log('PATHS FROM', fromPoint.toString(), ':', pretty(results, 4));
   const paths = results
-    .map((route, index) => ({ toPoint: toTest[index], result: route }))
+    .map(async route => {
+      route.result = await route.result;
+      console.log('ROUTE:', route);
+      console.log('ROUTE RESULT:', route.result);
+      return route;
+    })
     .filter(route => route.result && route.result.length);
 
   if (!paths.length) {
-    return [];
+    return { toPoint: fromPoint, result: [] };
   }
 
   console.log('VALID PATHS FROM', fromPoint.toString(), ':', paths.map(path => path.result.length));
@@ -157,9 +220,77 @@ function Explore(fromPoint) {
   );
   console.log('SHORTEST PATH FROM', fromPoint.toString(), ':', path.result.length);
   if (!path.result || !path.result.length) {
-    return [];
+    return { toPoint: fromPoint, result: [] };
   }
-  return [relativeDirection(fromPoint, path.toPoint)].concat(path.result);
+  return { toPoint: fromPoint, result: [path.toPoint].concat(path.result) };
+}
+
+function print(solution = null) {
+  const gridWidth = GridSize * 3 + 2;
+  let source = maze;
+
+  if (solution) {
+    source = maze.slice();
+    solution.path = solution.result.map((point, index) =>
+      index > 0 ? relativeDirection(solution.result[index - 1], point) : relativeDirection(beginAt, point),
+    );
+    solution.result.forEach((point, index) => {
+      if (point.toString() === endAt.toString()) return;
+      source[point.y][point.x] = DirectionArrows[solution.path[index]];
+    });
+  }
+
+  const flatRows = source.map((row, index) => {
+    const rowString = row.map(char => {
+      if (char === ' ') {
+        return chalk.dim.gray('.:.');
+      }
+      if (MovementSpaces[char]) {
+        return chalk.green(`[${char}]`);
+      }
+      return ` ${char} `;
+    });
+    return `${index}|${rowString.join('')}|${index}`;
+  });
+
+  // START/END LOCATIONS
+  console.log(chalk.yellow(`  ${chalk.green('[A]')} - ${beginAt.getKey()}\t${chalk.green('[B]')} - ${endAt.getKey()}`));
+  // START/END LOCATIONS
+
+  // TOP BORDER
+  console.log(
+    chalk.yellow(
+      ` ${Array(gridWidth)
+        .fill('_')
+        .join('')}`,
+    ),
+  );
+  // TOP BORDER
+
+  // MAZE CELLS
+  flatRows.forEach(row => console.log(chalk.yellow(row)));
+  // MAZE CELLS
+
+  // BOTTOM BORDER
+  console.log(
+    chalk.yellow(
+      ` ${Array(gridWidth)
+        .fill('-')
+        .join('')}`,
+    ),
+  );
+  // BOTTOM BORDER
+
+  // GRID NUMBERING
+  console.log(
+    chalk.yellow(
+      '  ',
+      Array.from(Array(maze.length))
+        .map((_, index) => ` ${index} `)
+        .join(''),
+    ),
+  );
+  // GRID NUMBERING
 }
 
 (async () => {
@@ -176,44 +307,14 @@ function Explore(fromPoint) {
 
   visited.set(beginAt.toString(), '');
 
-  const grid = maze.map(
-    row =>
-      `|${row
-        .map(cell => {
-          if (cell === ' ') {
-            return chalk.dim.gray('.:.');
-          }
-          if (MovementSpaces[cell]) {
-            return chalk.green(`[${cell}]`);
-          }
-          return ` ${cell} `;
-        })
-        .join('')}|`,
-  );
-
-  const gridWidth = maze[0].length * 3 + 2;
-
-  console.log(
-    chalk.yellow(
-      Array(gridWidth)
-        .fill('_')
-        .join(''),
-    ),
-  );
-
-  grid.forEach(row => console.log(chalk.yellow(row)));
-
-  console.log(
-    chalk.yellow(
-      Array(gridWidth)
-        .fill('-')
-        .join(''),
-    ),
-  );
+  print();
 
   const path = await Explore(beginAt);
 
-  console.log(`FINAL PATH (${path.length} moves): ${path.map(char => DirectionArrows[char])}`);
+  console.log('PATH:', path);
+  console.log(`FINAL PATH (${path.length} moves): ${path.result.map(char => DirectionArrows[char])}`);
+
+  print(path.result);
 
   response = await fetch(`https://api.noopschallenge.com${mazeConfig.mazePath}`, {
     method: 'POST',
