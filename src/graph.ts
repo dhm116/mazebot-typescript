@@ -1,7 +1,9 @@
 import chalk from 'chalk';
 import { IGraph, INode, MazeCharacterType } from './types';
-import { MazeCharacters } from './enums';
+import { MazeCharacters, DirectionalArrows } from './enums';
 import Node from './node';
+import NodeId from './id';
+import { INodeDirection, ShortestPath } from './dijkstra';
 
 export default class Graph implements IGraph {
   end: INode;
@@ -33,37 +35,52 @@ export default class Graph implements IGraph {
     });
 
     // Discover node neighbors
-    this.nodes.map(node => node.discoverNeighbors());
+    this.nodes.map(node => this.discoverNeighbors(node));
+  }
+
+  discoverNeighbors(node: INode) {
+    [
+      [node.location.x - 1, node.location.y],
+      [node.location.x + 1, node.location.y],
+      [node.location.x, node.location.y - 1],
+      [node.location.x, node.location.y + 1],
+    ]
+      .filter(([x, y]) => {
+        const invalidX = x < 0 || x >= this.grid.length;
+        const invalidY = y < 0 || y >= this.grid.length;
+        if (invalidX || invalidY) {
+          return false;
+        }
+        return true;
+      })
+      .map(([x, y]) => this.getNode(x, y))
+      .filter(node => node && node.space.isMoveable)
+      .forEach(neighbor => node.connectNode(neighbor));
   }
 
   getCharAt(x: number, y: number): MazeCharacterType {
     return this.grid[x][y] as MazeCharacterType;
   }
 
-  getId(x: number, y: number): number {
-    const gridSize = this.grid.length;
-    return y * gridSize + x;
-  }
-
   getNode(x: number, y: number): Node {
-    const id = this.getId(x, y);
+    const id = NodeId.gridId(x, y, this.grid.length);
     return this.nodes[id];
   }
 
-  print(): void {
+  print(solution?: ShortestPath): void {
     const gridWidth = this.grid.length * 3 + 2;
-    const source = this.grid;
+    let source = this.grid;
 
-    // if (solution) {
-    //   source = this.grid.slice();
-    //   solution.path = solution.result.map((point, index) =>
-    //     index > 0 ? relativeDirection(solution.result[index - 1], point) : relativeDirection(beginAt, point),
-    //   );
-    //   solution.result.forEach((point, index) => {
-    //     if (point.toString() === endAt.toString()) return;
-    //     source[point.y][point.x] = DirectionArrows[solution.path[index]];
-    //   });
-    // }
+    if (solution) {
+      source = this.grid.slice();
+      solution.path.forEach(move => {
+        // let color = chalk.red;
+        // if (source[move.y][move.x] === this.end.space.toString()) {
+        //   color = chalk.green;
+        // }
+        source[move.y][move.x] = chalk.red(move.direction.toString());
+      });
+    }
 
     const flatRows = source.map((row, index) => {
       const rowString = row.map((char: MazeCharacterType) => {
@@ -81,9 +98,7 @@ export default class Graph implements IGraph {
     // START/END LOCATIONS
     console.log(
       chalk.yellow(
-        `  ${chalk.green('[A]')} - ${this.start.location.toString()}\t${chalk.green(
-          '[B]',
-        )} - ${this.end.location.toString()}`,
+        `  ${chalk.green('[A]')} - ${this.start.id.toString()}\t${chalk.green('[B]')} - ${this.end.id.toString()}`,
       ),
     );
     // START/END LOCATIONS

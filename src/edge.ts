@@ -1,6 +1,9 @@
-import { IEdge, IEdgeList, INode } from './types';
+import { IEdge, IEdgeList, INode, INodeId } from './types';
+import { DirectionalArrows } from './enums';
 
 export class Edge implements IEdge {
+  protected _direction: DirectionalArrows;
+
   from: INode;
 
   to: INode;
@@ -11,15 +14,31 @@ export class Edge implements IEdge {
     this.from = from;
     this.to = to;
     this.weight = weight;
+
+    if (this.from.location.x < to.location.x) {
+      this._direction = DirectionalArrows.E;
+    } else {
+      this._direction = DirectionalArrows.W;
+    }
+
+    if (this.from.location.y < to.location.y) {
+      this._direction = DirectionalArrows.S;
+    } else if (this.from.location.y > to.location.y) {
+      this._direction = DirectionalArrows.N;
+    }
+  }
+
+  get direction(): DirectionalArrows {
+    return this._direction;
   }
 }
 
 export class EdgeList implements IEdgeList {
-  incoming: Map<number, IEdge>;
+  incoming: Map<INodeId, IEdge>;
 
   node: INode;
 
-  outgoing: Map<number, IEdge>;
+  outgoing: Map<INodeId, IEdge>;
 
   constructor(node: INode) {
     this.node = node;
