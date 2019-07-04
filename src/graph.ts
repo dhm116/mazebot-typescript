@@ -3,7 +3,7 @@ import { IGraph, INode, MazeCharacterType } from './types';
 import { MazeCharacters, DirectionalArrows } from './enums';
 import Node from './node';
 import NodeId from './id';
-import { INodeDirection, ShortestPath } from './dijkstra';
+import { ShortestPath } from './dijkstra';
 
 export default class Graph implements IGraph {
   end: INode;
@@ -67,6 +67,24 @@ export default class Graph implements IGraph {
     return this.nodes[id];
   }
 
+  protected stringifyRow(grid: string[][]): string[] {
+    return grid.map((row, index) => {
+      const rowString = row.map((char: MazeCharacterType) => {
+        if (char === ' ') {
+          return chalk.dim.gray(' . ');
+        }
+        if (char === 'X') {
+          return chalk.bold.dim.gray('###');
+        }
+        if ([MazeCharacters.A, MazeCharacters.B].includes(MazeCharacters[char])) {
+          return chalk.green(`[${char}]`);
+        }
+        return ` ${char} `;
+      });
+      return `${index.toString().padStart(3, ' ')}|${rowString.join('')}|${index}`;
+    });
+  }
+
   print(solution?: ShortestPath): void {
     const gridWidth = this.grid.length * 3 + 2;
     let source = this.grid;
@@ -82,18 +100,7 @@ export default class Graph implements IGraph {
       });
     }
 
-    const flatRows = source.map((row, index) => {
-      const rowString = row.map((char: MazeCharacterType) => {
-        if (char === ' ') {
-          return chalk.dim.gray('.:.');
-        }
-        if ([MazeCharacters.A, MazeCharacters.B].includes(MazeCharacters[char])) {
-          return chalk.green(`[${char}]`);
-        }
-        return ` ${char} `;
-      });
-      return `${index}|${rowString.join('')}|${index}`;
-    });
+    const flatRows = this.stringifyRow(source);
 
     // START/END LOCATIONS
     console.log(
@@ -106,7 +113,7 @@ export default class Graph implements IGraph {
     // TOP BORDER
     console.log(
       chalk.yellow(
-        ` ${Array(gridWidth)
+        `    ${Array(gridWidth)
           .fill('_')
           .join('')}`,
       ),
@@ -120,7 +127,7 @@ export default class Graph implements IGraph {
     // BOTTOM BORDER
     console.log(
       chalk.yellow(
-        ` ${Array(gridWidth)
+        `    ${Array(gridWidth)
           .fill('-')
           .join('')}`,
       ),
@@ -130,7 +137,7 @@ export default class Graph implements IGraph {
     // GRID NUMBERING
     console.log(
       chalk.yellow(
-        ' ',
+        '   ',
         Array.from(Array(this.grid.length))
           .map((_, index) => ` ${index} `)
           .join(''),

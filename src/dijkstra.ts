@@ -1,4 +1,4 @@
-import { IEdge, IGraph, INode, INodeLocation } from './types';
+import { IEdge, IGraph, INode, INodeLocation, INodeId } from './types';
 import { DirectionalArrows } from './enums';
 
 interface IWeightedNode {
@@ -11,10 +11,13 @@ export interface INodeDirection extends INodeLocation {
 }
 
 export class ShortestPath {
+  distances: Map<INode, IWeightedNode>;
+
   path: INodeDirection[];
 
-  constructor(path: INodeDirection[]) {
+  constructor(path: INodeDirection[], distances: Map<INode, IWeightedNode> = new Map<INode, IWeightedNode>()) {
     this.path = path;
+    this.distances = distances;
   }
 
   toString(): string {
@@ -34,22 +37,26 @@ export default class Dijkstra {
 
     distances.set(graph.start, { weight: 0 });
 
+    function manhattanDistance(a: INode, b: INode): number {
+      return Math.abs(a.location.x - b.location.x) + Math.abs(a.location.y - b.location.y);
+    }
+
     function inspectNeighbor(edge: IEdge) {
-      if (!visited.has(edge)) {
-        visited.add(edge);
-      } else {
+      if (visited.has(edge)) {
         return;
       }
-      const sum = distances.get(edge.from).weight + edge.weight;
+      visited.add(edge);
+      const weight = distances.get(edge.from).weight;
+      const sum = weight + manhattanDistance(edge.to, graph.end);
       if (sum < distances.get(edge.to).weight) {
         distances.set(edge.to, { weight: sum, edge });
       }
     }
 
-    function inspectAllNeighbors(from: INode, previous: INode) {
+    function inspectAllNeighbors(from: INode) {
       const edges = Array.from(from.edges.outgoing.values()).filter(edge => !visited.has(edge));
       edges.forEach((edge: IEdge) => inspectNeighbor(edge));
-      edges.forEach((edge: IEdge) => inspectAllNeighbors(edge.to, from));
+      edges.forEach((edge: IEdge) => inspectAllNeighbors(edge.to));
     }
 
     function followPathBack(to: INode, history: INodeDirection[] = []): INodeDirection[] {
@@ -69,7 +76,12 @@ export default class Dijkstra {
       return history;
     }
 
-    inspectAllNeighbors(graph.start, graph.start);
+    inspectAllNeighbors(graph.start);
+
+    // const startPoint = graph.start.id.toString();
+    // Array.from(distances.entries()).forEach(([node, edge]) => {
+    //   console.log(`${node.id.toString()} is ${edge.weight} from ${startPoint}`);
+    // });
 
     const directions = followPathBack(graph.end);
     return new ShortestPath(directions.reverse());
