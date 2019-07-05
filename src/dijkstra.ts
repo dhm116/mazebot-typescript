@@ -15,9 +15,9 @@ export class ShortestPath {
 
   path: INodeDirection[];
 
-  constructor(path: INodeDirection[], distances: Map<INode, IWeightedNode> = new Map<INode, IWeightedNode>()) {
+  constructor(path: INodeDirection[], distances?: Map<INode, IWeightedNode>) {
     this.path = path;
-    this.distances = distances;
+    this.distances = distances || new Map<INode, IWeightedNode>();
   }
 
   toString(): string {
@@ -37,6 +37,9 @@ export default class Dijkstra {
 
     distances.set(graph.start, { weight: 0 });
 
+    // For unweighted graphs, this creates an arbitrary metric to determine how far a given
+    // node is from another. This helps prevent the solution from wandering too far away
+    // from the goal, when possible.
     function manhattanDistance(a: INode, b: INode): number {
       return Math.abs(a.location.x - b.location.x) + Math.abs(a.location.y - b.location.y);
     }
@@ -45,18 +48,41 @@ export default class Dijkstra {
       if (visited.has(edge)) {
         return;
       }
-      visited.add(edge);
+
       const weight = distances.get(edge.from).weight;
       const sum = weight + manhattanDistance(edge.to, graph.end);
+
       if (sum < distances.get(edge.to).weight) {
         distances.set(edge.to, { weight: sum, edge });
       }
     }
 
-    function inspectAllNeighbors(from: INode) {
-      const edges = Array.from(from.edges.outgoing.values()).filter(edge => !visited.has(edge));
-      edges.forEach((edge: IEdge) => inspectNeighbor(edge));
-      edges.forEach((edge: IEdge) => inspectAllNeighbors(edge.to));
+    function inspectAllNeighbors(nodes: INode[], parents?: INode[]) {
+      if (nodes.includes(graph.end)) {
+        return;
+      }
+
+      const edges = new Set<IEdge>();
+      parents = parents || new Array<INode>();
+
+      nodes.forEach(node => {
+        Array.from(node.edges.outgoing.values())
+          .filter(edge => !visited.has(edge))
+          .forEach(edge => {
+            if (!parents.includes(edge.to)) {
+              edges.add(edge);
+            }
+          });
+      });
+
+      const neighbors: INode[] = Array.from(edges).map((edge: IEdge) => edge.to);
+
+      edges.forEach(edge => {
+        inspectNeighbor(edge);
+        visited.add(edge);
+      });
+
+      inspectAllNeighbors(neighbors, nodes);
     }
 
     function followPathBack(to: INode, history: INodeDirection[] = []): INodeDirection[] {
@@ -76,14 +102,9 @@ export default class Dijkstra {
       return history;
     }
 
-    inspectAllNeighbors(graph.start);
-
-    // const startPoint = graph.start.id.toString();
-    // Array.from(distances.entries()).forEach(([node, edge]) => {
-    //   console.log(`${node.id.toString()} is ${edge.weight} from ${startPoint}`);
-    // });
+    inspectAllNeighbors([graph.start]);
 
     const directions = followPathBack(graph.end);
-    return new ShortestPath(directions.reverse());
+    return new ShortestPath(directions.reverse(), distances);
   }
 }
