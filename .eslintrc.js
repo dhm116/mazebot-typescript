@@ -5,16 +5,13 @@ module.exports = {
     es6: true,
     node: true,
   },
+  parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2018,
   },
-  extends: ['airbnb', 'prettier'],
-  plugins: ['prettier'],
+  extends: ['plugin:@typescript-eslint/recommended', 'airbnb', 'prettier', 'prettier/@typescript-eslint'],
+  plugins: ['prettier', '@typescript-eslint'],
   rules: {
-    quotes: [
-      'error',
-      'single',
-      { avoidEscape: true, allowTemplateLiterals: false },
-    ],
+    quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
   },
 };
