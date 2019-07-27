@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "race": "ts-node race.js",
     "start": "ts-node index.js",
     "test": "jest"
   },
